@@ -17,7 +17,7 @@ void *receive_messages(void *socket_desc) {
             printf("Disconnected from server\n");
             break;
         }
-        printf("Server: %s\n", buffer);
+        printf("%s\n", buffer);
     }
     pthread_exit(NULL);
 }
@@ -59,7 +59,7 @@ int main() {
     }
 
     while (1) {
-        printf("You: ");
+        printf("Your move (1-9): ");
         fgets(buffer, sizeof(buffer), stdin);
         buffer[strcspn(buffer, "\n")] = 0; // Remove trailing newline
         send(sock, buffer, strlen(buffer), 0);
