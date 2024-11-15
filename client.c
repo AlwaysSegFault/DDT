@@ -18,6 +18,7 @@ void *receive_messages(void *socket_desc) {
             break;
         }
         printf("%s\n", buffer);
+        fflush(stdout);
     }
     pthread_exit(NULL);
 }
