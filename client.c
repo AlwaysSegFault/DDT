@@ -76,7 +76,7 @@ int main() {
         }
 
         // Ввод доступен только после получения обновлённой доски
-        printf("Your move (1-9): ");
+        printf("client (1-9): ");
         fflush(stdout);
         fgets(buffer, sizeof(buffer), stdin);
         buffer[strcspn(buffer, "\n")] = 0; // Убираем символ новой строки
