@@ -23,10 +23,10 @@ void *receive_messages(void *socket_desc) {
         printf("\n%s\n", buffer); // Отображаем сообщение от сервера
         fflush(stdout);           // Принудительный вывод
 
-        // Если сообщение от сервера — это не победа или ошибка, разрешаем ввод
+        // Если это не сообщение о победе или ошибке, разрешаем ввод
         if (strstr(buffer, "Invalid move") == NULL && 
             strstr(buffer, "wins") == NULL) {
-            can_input = 1;
+            can_input = 1; // Разрешаем ввод только после получения обновлённой доски
         }
     }
     pthread_exit(NULL);
@@ -75,13 +75,14 @@ int main() {
             usleep(100000); // Ждём, пока ввод не станет доступным
         }
 
+        // Ввод доступен только после получения обновлённой доски
         printf("Your move (1-9): ");
-        fflush(stdout); // Принудительно выводим подсказку
+        fflush(stdout);
         fgets(buffer, sizeof(buffer), stdin);
         buffer[strcspn(buffer, "\n")] = 0; // Убираем символ новой строки
 
         send(sock, buffer, strlen(buffer), 0);
-        can_input = 0; // Блокируем ввод до следующего разрешения от сервера
+        can_input = 0; // Блокируем ввод до следующего обновления доски
     }
 
     close(sock);
