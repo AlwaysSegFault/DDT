@@ -21,7 +21,6 @@ void initialize_board() {
 }
 
 void print_board() {
-    printf("\n");
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
             printf(" %c ", board[i][j]);
@@ -31,6 +30,20 @@ void print_board() {
         if (i < 2) printf("---|---|---\n");
     }
     printf("\n");
+}
+
+void send_board(int client_socket) {
+    char board_state[1024] = {0};
+    int offset = 0;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            offset += sprintf(board_state + offset, " %c ", board[i][j]);
+            if (j < 2) offset += sprintf(board_state + offset, "|");
+        }
+        offset += sprintf(board_state + offset, "\n");
+        if (i < 2) offset += sprintf(board_state + offset, "---|---|---\n");
+    }
+    send(client_socket, board_state, strlen(board_state), 0);
 }
 
 int check_winner() {
@@ -50,6 +63,7 @@ void *handle_client(void *socket_desc) {
 
     while (1) {
         print_board();
+        send_board(client_socket);
 
         // Проверка победителя
         int winner = check_winner();
@@ -61,7 +75,7 @@ void *handle_client(void *socket_desc) {
             break;
         }
 
-        if (current_turn == 1) {
+        if (current_turn == 1) { // Ход клиента
             memset(buffer, 0, sizeof(buffer));
             read(client_socket, buffer, sizeof(buffer));
             int move = atoi(buffer) - 1;
@@ -73,7 +87,7 @@ void *handle_client(void *socket_desc) {
             } else {
                 send(client_socket, "Invalid move", strlen("Invalid move"), 0);
             }
-        } else {
+        } else { // Ход сервера
             printf("Your move (1-9): ");
             fgets(buffer, sizeof(buffer), stdin);
             int move = atoi(buffer) - 1;
@@ -82,7 +96,6 @@ void *handle_client(void *socket_desc) {
             if (board[row][col] != 'X' && board[row][col] != 'O') {
                 board[row][col] = 'X';
                 current_turn = 1;
-                send(client_socket, buffer, strlen(buffer), 0);
             } else {
                 printf("Invalid move. Try again.\n");
             }
@@ -101,26 +114,22 @@ int main() {
 
     initialize_board();
 
-    // Создаем сокет
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == 0) {
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
 
-    // Настройка адреса сервера
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(PORT);
 
-    // Привязываем сокет к порту
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("Bind failed");
         close(server_fd);
         exit(EXIT_FAILURE);
     }
 
-    // Ожидаем подключения
     if (listen(server_fd, 3) < 0) {
         perror("Listen");
         close(server_fd);
