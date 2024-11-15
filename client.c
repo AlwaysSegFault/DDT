@@ -27,24 +27,20 @@ int main() {
     struct sockaddr_in serv_addr;
     char buffer[1024] = {0};
 
-    // Создаем сокет
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         perror("Socket creation error");
         return -1;
     }
 
-    // Настройка адреса сервера
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
 
-    // Преобразование IP-адреса
-    if (inet_pton(AF_INET, "172.28.117.177", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
         printf("Invalid address/ Address not supported\n");
         return -1;
     }
 
-    // Подключение к серверу
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         perror("Connection failed");
         return -1;
@@ -61,7 +57,7 @@ int main() {
     while (1) {
         printf("Your move (1-9): ");
         fgets(buffer, sizeof(buffer), stdin);
-        buffer[strcspn(buffer, "\n")] = 0; // Remove trailing newline
+        buffer[strcspn(buffer, "\n")] = 0;
         send(sock, buffer, strlen(buffer), 0);
     }
 
