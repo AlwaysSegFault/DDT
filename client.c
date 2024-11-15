@@ -24,7 +24,7 @@ int main() {
     serv_addr.sin_port = htons(PORT);
 
     // Преобразование IP-адреса
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, "172.28.117.177", &serv_addr.sin_addr) <= 0) {
         printf("\nInvalid address or Address not supported\n");
         return -1;
     }
