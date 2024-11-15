@@ -9,7 +9,7 @@
 int main() {
     int sock = 0;
     struct sockaddr_in serv_addr;
-    char *message = "Hello from client";
+    char *message = "000";
     char buffer[1024] = {0};
 
     // Создаем сокет
@@ -24,7 +24,7 @@ int main() {
     serv_addr.sin_port = htons(PORT);
 
     // Преобразование IP-адреса
-    if (inet_pton(AF_INET, "192.168.1.2", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
         printf("\nInvalid address or Address not supported\n");
         return -1;
     }
