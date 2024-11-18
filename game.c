@@ -53,7 +53,7 @@ int main(void) {
 
         // Рисуем квадрат
         DrawRectangleV(squarePosition, (Vector2){ squareSize, squareSize }, RED);
-        DrawText("Deni idiot", 10, 10, 20, DARKGRAY);
+        DrawText("Example", 10, 10, 20, DARKGRAY);
 
         EndDrawing();
     }
