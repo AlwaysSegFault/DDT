@@ -10,11 +10,12 @@ The best videogame for last 1000 years
 1. Дайте права на выполнение скрипта:
     ```bash
     chmod +x install_raylib.sh
+    tr -d '\r' < install_raylib.sh > temp.sh && mv temp.sh install_raylib.sh 
     ```
 
 2. Запустите скрипт:
     ```bash
-    ./install_raylib.sh
+    bash install_raylib.sh
     ```
 
 ### Что делает этот скрипт?
