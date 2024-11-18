@@ -14,7 +14,7 @@ The best videogame for last 1000 years
 
 2. Запустите скрипт:
     ```bash
-    ./install_raylib.sh
+    bash install_raylib.sh
     ```
 
 ### Что делает этот скрипт?
