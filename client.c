@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 
 #define PORT 12345
+#define MAX_PLAYERS 10
 #define BUFFER_SIZE 256
 
 // Структура для хранения позиции квадрата
@@ -14,24 +15,30 @@ typedef struct {
     float y;
 } Position;
 
-#define SERVER_IP "172.28.123.89"  // Задаем IP сервера
+// Структура для игрока
+typedef struct {
+    Position position;
+    Color color;
+    int active;  // Флаг активности игрока
+} Player;
+
+Player players[MAX_PLAYERS];
+int playerCount = 0; // Количество игроков, полученных от сервера
+
+#define SERVER_IP "127.0.0.1"  // Задаем IP сервера
 
 int main() {
     // Инициализация окна
     const int screenWidth = 800;
     const int screenHeight = 600;
-    InitWindow(screenWidth, screenHeight, "Клиент - Простая мультиплеерная игра");
-
-    // Позиция квадрата для клиента
-    Position clientPosition = {screenWidth / 1.5f, screenHeight / 2.0f};
-    const float squareSize = 50.0f;
+    InitWindow(screenWidth, screenHeight, "Клиент - Мультиплеерная игра");
 
     // Настроим клиент для UDP
     int sockfd;
     struct sockaddr_in server_addr;
     socklen_t server_addr_len = sizeof(server_addr);
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);  // Создаем UDP сокет
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);  // Создаем UDP-сокет
     if (sockfd < 0) {
         printf("Ошибка создания сокета\n");
         return -1;
@@ -41,8 +48,9 @@ int main() {
     server_addr.sin_port = htons(PORT);
     server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);  // Используем конкретный IP-адрес
 
-    // Начальный клиентский квадратик
-    Position serverPosition = {0, 0};  // Позиция сервера, которую мы будем обновлять
+    // Позиция клиента 
+    Position clientPosition = {screenWidth / 2.0f, screenHeight / 2.0f};
+    const float squareSize = 50.0f;
 
     // Главный игровой цикл
     SetTargetFPS(60);  // Устанавливаем FPS
@@ -57,21 +65,29 @@ int main() {
         sendto(sockfd, &clientPosition, sizeof(Position), 0, 
                (struct sockaddr*)&server_addr, sizeof(server_addr));
 
-        // Получаем позицию сервера
-        int bytesReceived = recvfrom(sockfd, &serverPosition, sizeof(Position), 0,
+        // Получаем позиции всех игроков от сервера
+        int bytesReceived = recvfrom(sockfd, players, sizeof(players), 0,
                                       (struct sockaddr*)&server_addr, &server_addr_len);
 
         if (bytesReceived > 0) {
-            // Начало рисования
-            BeginDrawing();
-            ClearBackground(RAYWHITE);
-
-            DrawText("Клиент", 10, 10, 20, DARKGRAY);
-            DrawRectangleV((Vector2){clientPosition.x, clientPosition.y}, (Vector2){squareSize, squareSize}, RED);   // Красный квадрат для клиента
-            DrawRectangleV((Vector2){serverPosition.x, serverPosition.y}, (Vector2){squareSize, squareSize}, BLUE);  // Синий квадрат для сервера
-
-            EndDrawing();
+            playerCount = bytesReceived / sizeof(Player);
         }
+
+        // Рисование
+        BeginDrawing();
+        ClearBackground(RAYWHITE);
+
+        // Рисуем квадраты всех активных игроков (кроме себя)
+        for (int i = 0; i < playerCount; i++) {
+            if (players[i].active && !(players[i].position.x == clientPosition.x && players[i].position.y == clientPosition.y)) {
+                DrawRectangleV((Vector2){players[i].position.x, players[i].position.y}, (Vector2){squareSize, squareSize}, players[i].color);
+            }
+        }
+
+        // Отрисовка квадрата самого клиента
+        DrawRectangleV((Vector2){clientPosition.x, clientPosition.y}, (Vector2){squareSize, squareSize}, (Color){255, 0, 0, 255});  // Например, красный
+
+        EndDrawing();
     }
 
     // Закрытие соединения
@@ -80,4 +96,3 @@ int main() {
 
     return 0;
 }
-
