@@ -1,69 +1,110 @@
+#include "raylib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <raylib.h>
 
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 12345
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
-
+#define PORT 12345
+#define BUFFER_SIZE 256
+#define SPEED 20
+#define screenWidth 1920
+#define screenHeight 1080
+// Структура для хранения позиции квадрата
 typedef struct {
-    float x, y;
-    int player_id;
-} PlayerData;
+    float x;
+    float y;
+} Position;
 
-int main(void) {
-    // Инициализация RayLib
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "UDP Game Client");
-    SetTargetFPS(60);
+#define SERVER_IP "172.28.123.89"  // Задаем IP сервера
 
-    int sockfd;
-    struct sockaddr_in server_addr;
-    PlayerData player;
-    player.x = SCREEN_WIDTH / 2;
-    player.y = SCREEN_HEIGHT / 2;
-    player.player_id = -1;  // Изначально ID = -1
+Position clientPosition = {screenWidth / 1.5f, screenHeight / 2.0f};
+const float squareSize = 50.0f;
 
-    // Создание сокета
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("Socket creation failed");
-        exit(1);
-    }
-
-    // Инициализация адреса сервера
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
-
-    // Получаем свой уникальный ID
-    while (player.player_id == -1) {
-        sendto(sockfd, &player, sizeof(PlayerData), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-        recvfrom(sockfd, &player, sizeof(PlayerData), 0, NULL, NULL);  // Получаем свой ID
-    }
-
-    while (!WindowShouldClose()) {
-        // Управление персонажем
-        if (IsKeyDown(KEY_RIGHT)) player.x += 5.0f;
-        if (IsKeyDown(KEY_LEFT)) player.x -= 5.0f;
-        if (IsKeyDown(KEY_UP)) player.y -= 5.0f;
-        if (IsKeyDown(KEY_DOWN)) player.y += 5.0f;
-
-        // Отправка данных о игроке на сервер
-        sendto(sockfd, &player, sizeof(PlayerData), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-
-        // Отображение экрана
-        BeginDrawing();
-        ClearBackground(RAYWHITE);
-        DrawCircle(player.x, player.y, 20, BLUE);  // Отображение квадратика
-        EndDrawing();
-    }
-
-    close(sockfd);
-    CloseWindow();
-    return 0;
+void move_client_position() {
+    // Пределы поля
+    if (clientPosition.x < 0) clientPosition.x = 0;
+    if (clientPosition.x > screenWidth - squareSize) clientPosition.x = screenWidth - squareSize;
+    if (clientPosition.y < 0) clientPosition.y = 0;
+    if (clientPosition.y > screenHeight - squareSize) clientPosition.y = screenHeight - squareSize;
 }
 
+// Проверка на коллизию между клиентом и сервером
+int check_collision(Position serverPos) {
+    return (clientPosition.x < serverPos.x + squareSize &&
+            clientPosition.x + squareSize > serverPos.x &&
+            clientPosition.y < serverPos.y + squareSize &&
+            clientPosition.y + squareSize > serverPos.y);
+}
+
+void handle_collision(Position serverPos) {
+    if (check_collision(serverPos)) {
+        // Останавливаем движение клиента по направлениям
+        if (clientPosition.x < serverPos.x) clientPosition.x = serverPos.x + squareSize;
+        else if (clientPosition.x > serverPos.x) clientPosition.x = serverPos.x - squareSize;
+
+        if (clientPosition.y < serverPos.y) clientPosition.y = serverPos.y + squareSize;
+        else if (clientPosition.y > serverPos.y) clientPosition.y = serverPos.y - squareSize;
+    }
+}
+
+int main() {
+
+    // Инициализация полноэкранного окна
+    InitWindow(screenWidth, screenHeight, "Клиент - Простая мультиплеерная игра");
+    ToggleFullscreen();  // Включаем полноэкранный режим
+
+    // Позиция квадрата для клиента
+    
+
+    // Настроим клиент для UDP
+    int sockfd;
+    struct sockaddr_in server_addr;
+    socklen_t server_addr_len = sizeof(server_addr);
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);  // Создаем UDP сокет
+    if (sockfd < 0) {
+        printf("Ошибка создания сокета\n");
+        return -1;
+    }
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(PORT);
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);  // Используем конкретный IP-адрес
+
+    // Начальный клиентский квадратик
+    Position serverPosition = {0, 0};  // Позиция сервера, которую мы будем обновлять
+
+    // Главный игровой цикл
+    SetTargetFPS(60);  // Устанавливаем FPS
+    while (!WindowShouldClose()) {
+        if (IsKeyDown(KEY_W)) clientPosition.y -= SPEED;
+        if (IsKeyDown(KEY_S)) clientPosition.y += SPEED;
+        if (IsKeyDown(KEY_A)) clientPosition.x -= SPEED;
+        if (IsKeyDown(KEY_D)) clientPosition.x += SPEED;
+
+        move_client_position();  // Проверка на выход за пределы экрана
+        handle_collision(serverPosition);  // Проверка коллизии с сервером
+
+        sendto(sockfd, &clientPosition, sizeof(Position), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+
+        int bytesReceived = recvfrom(sockfd, &serverPosition, sizeof(Position), 0,
+                                      (struct sockaddr*)&server_addr, &server_addr_len);
+
+        if (bytesReceived > 0) {
+            BeginDrawing();
+            ClearBackground(BLACK);
+            DrawRectangle((screenWidth - 10) / 2, 0, 10, screenHeight, WHITE);
+            DrawRectangleV((Vector2){clientPosition.x, clientPosition.y}, (Vector2){squareSize, squareSize}, RED);
+            DrawRectangleV((Vector2){serverPosition.x, serverPosition.y}, (Vector2){squareSize, squareSize}, BLUE);
+            EndDrawing();
+        }
+    }
+
+
+    // Закрытие соединения
+    close(sockfd);
+    CloseWindow();
+
+    return 0;
+}
