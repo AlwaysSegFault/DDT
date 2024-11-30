@@ -14,6 +14,8 @@
 #define screenHeight 1080
 #define squareSize 70.0f
 #define DIST 300
+#define RAD 50
+#define GATES 240
 
 typedef struct {
     float x;
@@ -74,6 +76,10 @@ void move_server() {
     if (serverRect.y > screenHeight - squareSize) serverRect.y = screenHeight - squareSize;
 }
 
+bool checkCollision(Rectangle rect1, Rectangle rect2, Rectangle rect3, Rectangle rect4, Rectangle rect5){
+  return CheckCollisionRecs(rect1, rect2) || CheckCollisionRecs(rect1, rect3) || CheckCollisionRecs(rect1, rect4) || CheckCollisionRecs(rect1, rect5);
+}
+
 void handleCollision() {
     if (CheckCollisionRecs(serverRect, clientRect)) {
         // Перемещаем клиентский квадрат так, чтобы он не пересекался с сервером
@@ -92,6 +98,10 @@ void handleCollision() {
     }
 }
 
+Rectangle rect1 = {0, (screenHeight - GATES) / 2 - 5, 25, 10};
+Rectangle rect2 = {0, (screenHeight + GATES) / 2 - 5 , 25, 10};
+Rectangle rect3 = {screenWidth - 25, (screenHeight - GATES) / 2 - 5, 25, 10};
+Rectangle rect4 = {screenWidth - 25, (screenHeight + GATES) / 2 - 5, 25, 10};
 
 
 int main() {
@@ -129,12 +139,27 @@ int main() {
         if (IsKeyDown(KEY_A)) serverRect.x -= SPEED;
         if (IsKeyDown(KEY_D)) serverRect.x += SPEED;
         
+        if(checkCollision(serverRect, rect1, rect2, rect3, rect4)){
+          serverRect.x = prevx;
+          serverRect.y = prevy;
+        }
+        
         handleCollision();
         move_server();  // Проверка на выход за пределы экрана
 
         BeginDrawing();
         ClearBackground(BLACK);
-        DrawRectangle((screenWidth - 10) / 2, 0, 10, screenHeight, WHITE);
+        
+        //Рисуем элементы поля
+        DrawCircle(screenWidth/2, screenHeight/2, 375, WHITE);
+        DrawCircle(screenWidth/2, screenHeight/2, 365, BLACK);
+        DrawRectangle((screenWidth - 10) / 2, 0, 10, screenHeight / 2 - RAD - 10, WHITE);
+        DrawRectangle((screenWidth - 10) / 2, screenHeight / 2 + RAD + 10, 10, screenHeight, WHITE);
+        DrawRectangleRec(rect1, WHITE);
+        DrawRectangleRec(rect2, WHITE);
+        DrawRectangleRec(rect3, WHITE);
+        DrawRectangleRec(rect4, WHITE);
+        
         DrawRectangleRec(serverRect, BLUE);
         if (clientConnected) {
             DrawRectangleRec(clientRect, RED);
