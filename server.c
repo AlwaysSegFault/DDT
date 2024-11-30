@@ -8,26 +8,23 @@
 #include <sys/select.h>  // Для работы с таймаутами
 
 #define PORT 12345
-#define BUFFER_SIZE 256
-#define SPEED 20
-#define CLIENT_TIMEOUT 5  // Таймаут для клиента в секундах
+#define SPEED 35
+#define CLIENT_TIMEOUT 2  // Таймаут для клиента в секундах
 #define screenWidth 1920
-#define screenHeight  1080
+#define screenHeight 1080
+#define squareSize 70.0f
+#define DIST 300
 
 typedef struct {
     float x;
     float y;
 } Position;
 
-
-
-
 int server_fd;
 struct sockaddr_in server_addr, client_addr;
 socklen_t client_addr_len = sizeof(client_addr);
-Position serverPosition = {400, 300};
-Position clientPosition = {600, 300};  // Начальная позиция клиента
-const float squareSize = 50.0f;
+Rectangle serverRect = {(screenWidth - squareSize) / 2 - DIST, (screenHeight - squareSize) / 2, squareSize, squareSize};
+Rectangle clientRect = {(screenWidth - squareSize) / 2 + DIST, (screenHeight - squareSize) / 2, squareSize, squareSize};
 int clientConnected = 0;  // Флаг, показывающий подключение клиента
 
 void* handle_client(void* arg) {
@@ -46,18 +43,18 @@ void* handle_client(void* arg) {
 
         if (ready > 0) {
             // Получаем данные от клиента
-            bytesReceived = recvfrom(server_fd, &clientPosition, sizeof(Position), 0, 
+            bytesReceived = recvfrom(server_fd, &clientRect, sizeof(Rectangle), 0, 
                                      (struct sockaddr*)&client_addr, &client_addr_len);
             if (bytesReceived > 0) {
                 clientConnected = 1;  // Клиент подключился
                 // Отправляем серверные координаты обратно клиенту
-                sendto(server_fd, &serverPosition, sizeof(Position), 0, 
+                sendto(server_fd, &serverRect, sizeof(Rectangle), 0, 
                        (struct sockaddr*)&client_addr, client_addr_len);
             }
         } else {
             // Таймаут, клиент не прислал данные
-            clientPosition.x = -1;  // Убираем квадрат клиента
-            clientPosition.y = -1;  // Убираем квадрат клиента
+            clientRect.x = -1;  // Убираем квадрат клиента
+            clientRect.y = -1;  // Убираем квадрат клиента
             clientConnected = 0;  // Клиент отсоединился
         }
 
@@ -69,49 +66,32 @@ void* handle_client(void* arg) {
     return NULL;
 }
 
-// Внесем изменения в обработку движения сервера и клиента, добавим проверку на коллизию
-
 void move_server() {
     // Пределы поля
-    if (serverPosition.x < 0) serverPosition.x = 0;
-    if (serverPosition.x > screenWidth - squareSize) serverPosition.x = screenWidth - squareSize;
-    if (serverPosition.y < 0) serverPosition.y = 0;
-    if (serverPosition.y > screenHeight - squareSize) serverPosition.y = screenHeight - squareSize;
+    if (serverRect.x < 0) serverRect.x = 0;
+    if (serverRect.x > screenWidth - squareSize) serverRect.x = screenWidth - squareSize;
+    if (serverRect.y < 0) serverRect.y = 0;
+    if (serverRect.y > screenHeight - squareSize) serverRect.y = screenHeight - squareSize;
 }
 
-void move_client() {
-    // Пределы поля
-    if (clientPosition.x < 0) clientPosition.x = 0;
-    if (clientPosition.x > screenWidth - squareSize) clientPosition.x = screenWidth - squareSize;
-    if (clientPosition.y < 0) clientPosition.y = 0;
-    if (clientPosition.y > screenHeight - squareSize) clientPosition.y = screenHeight - squareSize;
-}
-
-// Проверка на коллизию между сервером и клиентом
-int check_collision() {
-    return (serverPosition.x < clientPosition.x + squareSize &&
-            serverPosition.x + squareSize > clientPosition.x &&
-            serverPosition.y < clientPosition.y + squareSize &&
-            serverPosition.y + squareSize > clientPosition.y);
-}
-
-void handle_collision() {
-    if (check_collision()) {
-        // Останавливаем движение сервера и клиента по направлениям
-        // Отменяем движение, если есть пересечение
-        if (serverPosition.x < clientPosition.x) serverPosition.x = clientPosition.x + squareSize;
-        else if (serverPosition.x > clientPosition.x) serverPosition.x = clientPosition.x - squareSize;
-
-        if (serverPosition.y < clientPosition.y) serverPosition.y = clientPosition.y + squareSize;
-        else if (serverPosition.y > clientPosition.y) serverPosition.y = clientPosition.y - squareSize;
-
-        if (clientPosition.x < serverPosition.x) clientPosition.x = serverPosition.x + squareSize;
-        else if (clientPosition.x > serverPosition.x) clientPosition.x = serverPosition.x - squareSize;
-
-        if (clientPosition.y < serverPosition.y) clientPosition.y = serverPosition.y + squareSize;
-        else if (clientPosition.y > serverPosition.y) clientPosition.y = serverPosition.y - squareSize;
+void handleCollision() {
+    if (CheckCollisionRecs(serverRect, clientRect)) {
+        // Перемещаем клиентский квадрат так, чтобы он не пересекался с сервером
+        if (serverRect.x + squareSize > clientRect.x && serverRect.x < clientRect.x) {
+            serverRect.x = clientRect.x - squareSize;
+        }
+        else if (serverRect.x < clientRect.x + squareSize && serverRect.x + squareSize > clientRect.x + squareSize) {
+            serverRect.x = clientRect.x + squareSize;
+        }
+        else if (serverRect.y + squareSize > clientRect.y && serverRect.y < clientRect.y) {
+            serverRect.y = clientRect.y - squareSize;
+        }
+        else if (serverRect.y < clientRect.y + squareSize && serverRect.y + squareSize > clientRect.y + squareSize) {
+            serverRect.y = clientRect.y + squareSize;
+        }
     }
 }
+
 
 
 int main() {
@@ -139,29 +119,28 @@ int main() {
     pthread_create(&thread_id, NULL, handle_client, NULL);
 
     SetTargetFPS(60);
-
+    
     while (!WindowShouldClose()) {
-    if (IsKeyDown(KEY_W)) serverPosition.y -= SPEED;
-    if (IsKeyDown(KEY_S)) serverPosition.y += SPEED;
-    if (IsKeyDown(KEY_A)) serverPosition.x -= SPEED;
-    if (IsKeyDown(KEY_D)) serverPosition.x += SPEED;
+        float prevx = serverRect.x;
+        float prevy = serverRect.y;
+        
+        if (IsKeyDown(KEY_W)) serverRect.y -= SPEED;
+        if (IsKeyDown(KEY_S)) serverRect.y += SPEED;
+        if (IsKeyDown(KEY_A)) serverRect.x -= SPEED;
+        if (IsKeyDown(KEY_D)) serverRect.x += SPEED;
+        
+        handleCollision();
+        move_server();  // Проверка на выход за пределы экрана
 
-    move_server();  // Проверка на выход за пределы экрана
-    handle_collision();  // Проверка коллизии
-
-    BeginDrawing();
-    ClearBackground(BLACK);
-    int rectWidth = 10;
-    
-    
-    DrawRectangle((screenWidth - rectWidth) / 2, 0, rectWidth, screenHeight, WHITE);
-    DrawRectangle((int)serverPosition.x, (int)serverPosition.y, (int)squareSize, (int)squareSize, BLUE);
-    if (clientConnected) {
-        DrawRectangle((int)clientPosition.x, (int)clientPosition.y, (int)squareSize, (int)squareSize, RED);
+        BeginDrawing();
+        ClearBackground(BLACK);
+        DrawRectangle((screenWidth - 10) / 2, 0, 10, screenHeight, WHITE);
+        DrawRectangleRec(serverRect, BLUE);
+        if (clientConnected) {
+            DrawRectangleRec(clientRect, RED);
+        }
+        EndDrawing();
     }
-    EndDrawing();
-}
-
 
     close(server_fd);
     CloseWindow();

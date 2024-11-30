@@ -6,63 +6,50 @@
 #include <arpa/inet.h>
 
 #define PORT 12345
-#define BUFFER_SIZE 256
-#define SPEED 20
+#define SPEED 35
 #define screenWidth 1920
 #define screenHeight 1080
-// Структура для хранения позиции квадрата
-typedef struct {
-    float x;
-    float y;
-} Position;
+#define DIST 300
+#define squareSize 70.0f
+#define SERVER_IP "172.28.123.89"  
 
-#define SERVER_IP "172.28.123.89"  // Задаем IP сервера
-
-Position clientPosition = {screenWidth / 1.5f, screenHeight / 2.0f};
-const float squareSize = 50.0f;
+Rectangle clientRect = {(screenWidth - squareSize) / 2 + DIST, (screenHeight - squareSize) / 2, squareSize, squareSize};
+Rectangle serverRect = {0, 0, squareSize, squareSize};
 
 void move_client_position() {
-    // Пределы поля
-    if (clientPosition.x < 0) clientPosition.x = 0;
-    if (clientPosition.x > screenWidth - squareSize) clientPosition.x = screenWidth - squareSize;
-    if (clientPosition.y < 0) clientPosition.y = 0;
-    if (clientPosition.y > screenHeight - squareSize) clientPosition.y = screenHeight - squareSize;
+    if (clientRect.x < 0) clientRect.x = 0;
+    if (clientRect.x > screenWidth - squareSize) clientRect.x = screenWidth - squareSize;
+    if (clientRect.y < 0) clientRect.y = 0;
+    if (clientRect.y > screenHeight - squareSize) clientRect.y = screenHeight - squareSize;
 }
 
-// Проверка на коллизию между клиентом и сервером
-int check_collision(Position serverPos) {
-    return (clientPosition.x < serverPos.x + squareSize &&
-            clientPosition.x + squareSize > serverPos.x &&
-            clientPosition.y < serverPos.y + squareSize &&
-            clientPosition.y + squareSize > serverPos.y);
-}
-
-void handle_collision(Position serverPos) {
-    if (check_collision(serverPos)) {
-        // Останавливаем движение клиента по направлениям
-        if (clientPosition.x < serverPos.x) clientPosition.x = serverPos.x + squareSize;
-        else if (clientPosition.x > serverPos.x) clientPosition.x = serverPos.x - squareSize;
-
-        if (clientPosition.y < serverPos.y) clientPosition.y = serverPos.y + squareSize;
-        else if (clientPosition.y > serverPos.y) clientPosition.y = serverPos.y - squareSize;
+void handleCollision() {
+    if (CheckCollisionRecs(clientRect, serverRect)) {
+        // Перемещаем клиентский квадрат так, чтобы он не пересекался с сервером
+        if (clientRect.x + squareSize > serverRect.x && clientRect.x < serverRect.x) {
+            clientRect.x = serverRect.x - squareSize;
+        }
+        else if (clientRect.x < serverRect.x + squareSize && clientRect.x + squareSize > serverRect.x + squareSize) {
+            clientRect.x = serverRect.x + squareSize;
+        }
+        else if (clientRect.y + squareSize > serverRect.y && clientRect.y < serverRect.y) {
+            clientRect.y = serverRect.y - squareSize;
+        }
+        else if (clientRect.y < serverRect.y + squareSize && clientRect.y + squareSize > serverRect.y + squareSize) {
+            clientRect.y = serverRect.y + squareSize;
+        }
     }
 }
 
 int main() {
-
-    // Инициализация полноэкранного окна
     InitWindow(screenWidth, screenHeight, "Клиент - Простая мультиплеерная игра");
-    ToggleFullscreen();  // Включаем полноэкранный режим
+    ToggleFullscreen(); 
 
-    // Позиция квадрата для клиента
-    
-
-    // Настроим клиент для UDP
     int sockfd;
     struct sockaddr_in server_addr;
     socklen_t server_addr_len = sizeof(server_addr);
 
-    sockfd = socket(AF_INET, SOCK_DGRAM, 0);  // Создаем UDP сокет
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0); 
     if (sockfd < 0) {
         printf("Ошибка создания сокета\n");
         return -1;
@@ -70,41 +57,41 @@ int main() {
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT);
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);  // Используем конкретный IP-адрес
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);    
 
-    // Начальный клиентский квадратик
-    Position serverPosition = {0, 0};  // Позиция сервера, которую мы будем обновлять
-
-    // Главный игровой цикл
-    SetTargetFPS(60);  // Устанавливаем FPS
+    SetTargetFPS(60);  
+    
     while (!WindowShouldClose()) {
-        if (IsKeyDown(KEY_W)) clientPosition.y -= SPEED;
-        if (IsKeyDown(KEY_S)) clientPosition.y += SPEED;
-        if (IsKeyDown(KEY_A)) clientPosition.x -= SPEED;
-        if (IsKeyDown(KEY_D)) clientPosition.x += SPEED;
+        float prevx = clientRect.x;
+        float prevy = clientRect.y;
+        
+        if (IsKeyDown(KEY_W)) clientRect.y -= SPEED;
+        if (IsKeyDown(KEY_S)) clientRect.y += SPEED;
+        if (IsKeyDown(KEY_A)) clientRect.x -= SPEED;
+        if (IsKeyDown(KEY_D)) clientRect.x += SPEED;
 
-        move_client_position();  // Проверка на выход за пределы экрана
-        handle_collision(serverPosition);  // Проверка коллизии с сервером
+        handleCollision();  // Проверка на коллизию с сервером
+        
+        move_client_position();   
 
-        sendto(sockfd, &clientPosition, sizeof(Position), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
+        sendto(sockfd, &clientRect, sizeof(Rectangle), 0, (struct sockaddr*)&server_addr, sizeof(server_addr));
 
-        int bytesReceived = recvfrom(sockfd, &serverPosition, sizeof(Position), 0,
+        int bytesReceived = recvfrom(sockfd, &serverRect, sizeof(Rectangle), 0,
                                       (struct sockaddr*)&server_addr, &server_addr_len);
 
         if (bytesReceived > 0) {
             BeginDrawing();
             ClearBackground(BLACK);
             DrawRectangle((screenWidth - 10) / 2, 0, 10, screenHeight, WHITE);
-            DrawRectangleV((Vector2){clientPosition.x, clientPosition.y}, (Vector2){squareSize, squareSize}, RED);
-            DrawRectangleV((Vector2){serverPosition.x, serverPosition.y}, (Vector2){squareSize, squareSize}, BLUE);
+            DrawRectangleRec(clientRect, RED);
+            DrawRectangleRec(serverRect, BLUE);
             EndDrawing();
         }
     }
 
-
-    // Закрытие соединения
     close(sockfd);
     CloseWindow();
 
     return 0;
 }
+
